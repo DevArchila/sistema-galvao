@@ -93,7 +93,8 @@ def listar_transacoes():
             c.nome AS cliente,
             s.nome AS servico,
             t.data_hora,
-            t.valor
+            t.valor,
+            t.pagamento
         FROM Transacoes t
         JOIN Clientes c ON t.id_cliente = c.id
         JOIN Servicos s ON t.id_servico = s.id
@@ -102,13 +103,13 @@ def listar_transacoes():
     conn.close()
     return dados
 
-def adicionar_transacao(id_cliente, id_servico, data_hora, valor):
+def adicionar_transacao(id_cliente, id_servico, data_hora, valor, pagamento):
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO Transacoes (id_cliente, id_servico, data_hora, valor)
-        VALUES (?, ?, ?, ?)
-    """, (id_cliente, id_servico, data_hora, valor))
+        INSERT INTO Transacoes (id_cliente, id_servico, data_hora, valor, pagamento)
+        VALUES (?, ?, ?, ?, ?)
+    """, (id_cliente, id_servico, data_hora, valor, pagamento))
     conn.commit()
     conn.close()
 
@@ -218,9 +219,9 @@ elif pagina == 'Estoque':
 
     st.subheader('Adicionar produto')
     with st.form('form_produto'):
-        nome = st.text_input('Nome')
+        nome = st.text_input('Nome do produto')
         validade = st.text_input('Validade')
-        preco = st.number_input('Preço', min_value=0.0, format="%.2f")
+        preco = st.number_input('Preço unitário', min_value=0.0, format="%.2f")
         quantidade = st.number_input('Quantidade', min_value=0, step=1)
         salvar = st.form_submit_button('Salvar')
 
@@ -351,7 +352,7 @@ elif pagina == 'Transações':
     transacoes = listar_transacoes()
     if transacoes:
         st.subheader('Serviços Prestados')
-        df = pd.DataFrame(transacoes, columns=['ID', 'Cliente', 'Serviço', 'Data/Hora', 'Valor (R$)'])
+        df = pd.DataFrame(transacoes, columns=['ID', 'Cliente', 'Serviço', 'Data/Hora', 'Valor (R$)', 'Pagamento'])
         st.dataframe(df, use_container_width=True, hide_index=True)
 
         excluir_id = st.number_input('ID da transação para excluir', min_value=1, step=1)
@@ -372,11 +373,12 @@ elif pagina == 'Transações':
 
         data_hora = st.text_input('Data e Hora (ex: 2026-10-20 14:00)')
         valor = st.number_input('Valor (R$)', min_value=0.0, format="%.2f")
+        pagamento = st.selectbox('Pagamento', ['Pendente', 'Concluído'])
         salvar = st.form_submit_button('Salvar')
 
     if salvar:
         if data_hora and valor:
-            adicionar_transacao(id_cliente, id_servico, data_hora, valor)
+            adicionar_transacao(id_cliente, id_servico, data_hora, valor, pagamento)
             st.success('Transação registrada!')
             st.rerun()
         else:
