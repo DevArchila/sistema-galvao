@@ -120,18 +120,18 @@ def excluir_estoque(id):
 def listar_servicos():
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, nome, tempo_medio, preco FROM Servicos")
+    cursor.execute("SELECT id, nome FROM Servicos")
     dados = cursor.fetchall()
     conn.close()
     return dados
 
-def adicionar_servico(nome, tempo_medio, preco):
+def adicionar_servico(nome, ):
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO Servicos (nome, tempo_medio, preco)
-        VALUES (?, ?, ?)
-    """, (nome, tempo_medio, preco))
+        INSERT INTO Servicos (nome)
+        VALUES (?)
+    """, (nome))
     conn.commit()
     conn.close()
 
@@ -199,15 +199,39 @@ def listar_agendamentos():
     conn.close()
     return dados
 
-def adicionar_agendamento(id_cliente, id_servico, data_hora, status, observacao):
+def adicionar_agendamento(
+    id_cliente, id_servico, data_hora, status, observacao, valor=0.0
+):
     conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO Agendamentos (id_cliente, id_servico, data_hora, status, observacao)
-        VALUES (?, ?, ?, ?, ?)
-    """, (id_cliente, id_servico, data_hora, status, observacao))
-    conn.commit()
-    conn.close()
+
+    try:
+        cursor = conn.cursor()
+
+        # Cria o agendamento
+        cursor.execute("""
+            INSERT INTO Agendamentos
+                (id_cliente, id_servico, data_hora, status, observacao)
+            VALUES (?, ?, ?, ?, ?)
+        """, (id_cliente, id_servico, data_hora, status, observacao))
+
+        # Pega o id do agendamento recém-criado
+        id_agendamento = cursor.lastrowid
+
+        # Cria a transação vinculada ao agendamento
+        cursor.execute("""
+            INSERT INTO Transacoes
+                (id_transacao, id_cliente, id_servico, data_hora, valor, pagamento)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (id_agendamento, id_cliente, id_servico, data_hora, valor, 'Pendente'))
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 def excluir_agendamento(id):
     conn = conectar()
@@ -348,20 +372,15 @@ elif pagina == 'Serviços':
     servicos = listar_servicos()
     if servicos:
         st.subheader('Serviços disponíveis')
-        df = pd.DataFrame(servicos, columns=['ID', 'Nome', 'Tempo Médio (min)', 'Preço (R$)'])
+        df = pd.DataFrame(servicos, columns=['ID', 'Nome'])
         editado = st.data_editor(
             df, key='editor_servicos', use_container_width=True, hide_index=True,
             num_rows='fixed', disabled=['ID'],
-            column_config={
-                'Tempo Médio (min)': st.column_config.NumberColumn('Tempo Médio (min)', min_value=0, step=1),
-                'Preço (R$)': st.column_config.NumberColumn('Preço (R$)', min_value=0.0, format='%.2f')
-            }
         )
         if st.button('Salvar alterações nos serviços', key='salvar_servicos'):
             try:
                 salvar_edicoes(df, editado, 'Servicos', {
-                    'Nome': 'nome', 'Tempo Médio (min)': 'tempo_medio', 'Preço (R$)': 'preco'
-                })
+                    'Nome': 'nome'})
                 st.success('Alterações dos serviços salvas.')
                 st.rerun()
             except sqlite3.Error as erro:
@@ -383,14 +402,12 @@ elif pagina == 'Serviços':
     st.subheader('Adicionar serviço')
     with st.form('form_servico'):
         nome = st.text_input('Nome')
-        tempo_medio = st.number_input('Tempo médio (min)', min_value=0, step=1)
-        preco = st.number_input('Preço', min_value=0.0, format="%.2f")
         salvar = st.form_submit_button('Salvar')
 
     if salvar:
         if nome.strip():
             try:
-                adicionar_servico(nome.strip(), tempo_medio, preco)
+                adicionar_servico(nome.strip())
                 st.success('Serviço adicionado!')
                 st.rerun()
             except sqlite3.Error as erro:
@@ -471,13 +488,14 @@ elif pagina == 'Agendamentos':
 
         data_hora = st.text_input('Data e Hora (ex: 2026-10-20 14:00)')
         status = st.selectbox('Status', ['Agendado', 'Aguardando', 'Concluído', 'Cancelado'])
+        valor = st.number_input('Valor do serviço (R$)', min_value=0.0, format="%.2f")
         observacao = st.text_input('Observações')
         salvar = st.form_submit_button('Salvar')
 
     if salvar:
         if validar_data_hora(data_hora):
             try:
-                adicionar_agendamento(id_cliente, id_servico, data_hora.strip(), status, observacao.strip() or None)
+                adicionar_agendamento(id_cliente, id_servico, data_hora.strip(), status, observacao.strip() or None, valor)
                 st.success('Agendamento adicionado!')
                 st.rerun()
             except sqlite3.Error as erro:
