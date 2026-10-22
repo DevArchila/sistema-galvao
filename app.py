@@ -149,6 +149,7 @@ def listar_transacoes():
     cursor.execute("""
         SELECT
             t.id,
+            t.id_agendamento,
             c.nome AS cliente,
             s.nome AS servico,
             t.data_hora,
@@ -220,7 +221,7 @@ def adicionar_agendamento(
         # Cria a transação vinculada ao agendamento
         cursor.execute("""
             INSERT INTO Transacoes
-                (id_transacao, id_cliente, id_servico, data_hora, valor, pagamento)
+                (id_agendamento, id_cliente, id_servico, data_hora, valor, pagamento)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (id_agendamento, id_cliente, id_servico, data_hora, valor, 'Pendente'))
 
@@ -530,7 +531,7 @@ elif pagina == 'Transações':
     transacoes = listar_transacoes()
     if transacoes:
         st.subheader('Serviços Prestados')
-        df = pd.DataFrame(transacoes, columns=['ID', 'Cliente', 'Serviço', 'Data/Hora', 'Valor (R$)', 'Pagamento'])
+        df = pd.DataFrame(transacoes, columns=['ID', 'ID Agendamento', 'Cliente', 'Serviço', 'Data/Hora', 'Valor (R$)', 'Pagamento'])
         editado = st.data_editor(
             df, key='editor_transacoes', use_container_width=True, hide_index=True,
             num_rows='fixed', disabled=['ID', 'Cliente', 'Serviço'],
